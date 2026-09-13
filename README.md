@@ -73,8 +73,8 @@ If you are using this software, please consider to give it a star ⭐ on [Github
 
 ## Screenshots
 
-<img width=30% src="https://github.com/leohearts/AlternativeUnlockXposed/assets/24632029/dc4e953e-84d3-44d2-90f8-1fabee249f62">
-<img width=30% src="https://github.com/leohearts/AlternativeUnlockXposed/assets/24632029/14464a95-1d45-47fa-8fc1-1b70584adc46">
+<img width=30% src="fastlane/metadata/android/en-US/images/phoneScreenshots/01.png">
+<img width=30% src="fastlane/metadata/android/en-US/images/phoneScreenshots/02.png">
 
 ## How does it work ?
 
