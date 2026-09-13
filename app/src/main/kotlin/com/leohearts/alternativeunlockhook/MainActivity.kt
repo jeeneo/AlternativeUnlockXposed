@@ -20,9 +20,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.QuestionMark
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Terminal
@@ -59,7 +61,6 @@ import androidx.compose.ui.text.font.Typeface
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.leohearts.alternativeunlockhook.R
 import com.leohearts.alternativeunlockhook.ui.theme.AlternativeUnlockXposedTheme
 import com.leohearts.alternativeunlockhook.ui.theme.CardPosition
 import com.leohearts.alternativeunlockhook.ui.theme.GroupedListSpacing
@@ -131,7 +132,12 @@ fun Properties.setBooleanProperty(key: String, value: Boolean) {
     setProperty(key, value.toString())
 }
 
-fun saveConfig(context: Context, config: Properties, scope: CoroutineScope, snackbarHostState: SnackbarHostState) {
+fun saveConfig(
+    context: Context,
+    config: Properties,
+    scope: CoroutineScope,
+    snackbarHostState: SnackbarHostState
+) {
     val process = RootShell.sudo("cat > ${HookClass.CONFIG_PATH}")
     if (process != null) {
         config.store(process.outputStream, "")
@@ -183,7 +189,10 @@ fun GroupedWrapper(
         ) {
             Text(title)
             if (description.isEmpty()) {
-                Text(stringResource(R.string.value_empty), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.value_empty),
+                    style = MaterialTheme.typography.bodyMedium
+                )
             } else {
                 Text(
                     description,
@@ -241,21 +250,22 @@ fun SettingsBase(modifier: Modifier = Modifier) {
             val setKey = rememberSaveable { mutableStateOf("") }
             val setHint = rememberSaveable { mutableStateOf("") }
             var dynamicLoadchecked by remember {
-                mutableStateOf(
-                    config.getBooleanProperty("dynamicLoad")
-                )
+                mutableStateOf(config.getBooleanProperty("dynamicLoad"))
+            }
+            var timePinChecked by remember {
+                mutableStateOf(config.getBooleanProperty("timeIsPIN"))
             }
             var hideUIPassword by remember {
-                mutableStateOf(
-                    config.getBooleanProperty("hideUIPassword")
-                )
+                mutableStateOf(config.getBooleanProperty("hideUIPassword"))
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(GroupedListSpacing)) {
                 SmallHeading(stringResource(R.string.section_password))
                 GroupedWrapper(
                     title = stringResource(R.string.fake_password),
-                    description = config.getProperty("fakePassword", stringResource(R.string.not_set)),
+                    description = config.getProperty(
+                        "fakePassword", stringResource(R.string.not_set)
+                    ),
                     icon = Icons.Rounded.QuestionMark,
                     position = CardPosition.Leading,
                     onClick = {
@@ -266,7 +276,9 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                     },
                     onLongClick = {
                         config.remove("fakePassword")
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                 )
                 GroupedWrapper(
@@ -284,7 +296,9 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                     },
                     onLongClick = {
                         config.remove("realPassword")
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                 )
             }
@@ -301,12 +315,13 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                         openDialog.value = true
                         setTitle.value = context.getString(R.string.action_type_title)
                         setKey.value = "actionType"
-                        setHint.value =
-                            context.getString(R.string.action_type_hint)
+                        setHint.value = context.getString(R.string.action_type_hint)
                     },
                     onLongClick = {
                         config.setProperty("actionType", "sh")
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                 )
                 GroupedWrapper(
@@ -323,7 +338,9 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                     },
                     onLongClick = {
                         config.setProperty("actionCommand", "whoami")
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                 )
             }
@@ -332,24 +349,60 @@ fun SettingsBase(modifier: Modifier = Modifier) {
             Column(verticalArrangement = Arrangement.spacedBy(GroupedListSpacing)) {
                 GroupedWrapper(
                     title = stringResource(R.string.dynamic_load_title),
-                    description = if (!dynamicLoadchecked) stringResource(R.string.dynamic_load_manual) else stringResource(R.string.dynamic_load_always),
+                    description = if (!dynamicLoadchecked) stringResource(R.string.dynamic_load_manual) else stringResource(
+                        R.string.dynamic_load_always
+                    ),
                     icon = Icons.Rounded.Refresh,
                     position = CardPosition.Leading,
                     onClick = {
                         dynamicLoadchecked = !dynamicLoadchecked
                         config.setBooleanProperty("dynamicLoad", dynamicLoadchecked)
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                     onLongClick = {
                         dynamicLoadchecked = false
                         config.setBooleanProperty("dynamicLoad", false)
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                     trailing = {
                         Switch(
                             checked = dynamicLoadchecked, onCheckedChange = {
                                 dynamicLoadchecked = it
                                 config.setBooleanProperty("dynamicLoad", it)
+                                refreshingSave(
+                                    context, config, scope, snackbarHostState
+                                ) { refreshTrigger++ }
+                            })
+                    },
+                )
+                GroupedWrapper(
+                    title = "Use time as PIN",
+                    description = if (timePinChecked) "The current time will unlock (padded with zeros)" else "Fake pin will unlock",
+                    icon = if (timePinChecked) Icons.Rounded.AccessTime else Icons.Rounded.Pin,
+                    position = CardPosition.Center,
+                    onClick = {
+                        timePinChecked = !timePinChecked
+                        config.setBooleanProperty("timeIsPIN", timePinChecked)
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
+                    },
+                    onLongClick = {
+                        timePinChecked = false
+                        config.setBooleanProperty("timeIsPIN", false)
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
+                    },
+                    trailing = {
+                        Switch(
+                            checked = timePinChecked, onCheckedChange = {
+                                timePinChecked = it
+                                config.setBooleanProperty("timeIsPIN", it)
                                 refreshingSave(
                                     context, config, scope, snackbarHostState
                                 ) { refreshTrigger++ }
@@ -381,12 +434,16 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                     onClick = {
                         hideUIPassword = !hideUIPassword
                         config.setBooleanProperty("hideUIPassword", hideUIPassword)
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                     onLongClick = {
                         hideUIPassword = false
                         config.setBooleanProperty("hideUIPassword", false)
-                        refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                        refreshingSave(
+                            context, config, scope, snackbarHostState
+                        ) { refreshTrigger++ }
                     },
                     trailing = {
                         Switch(
@@ -429,7 +486,9 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                 }, confirmButton = {
                     TextButton(
                         onClick = {
-                            refreshingSave(context, config, scope, snackbarHostState) { refreshTrigger++ }
+                            refreshingSave(
+                                context, config, scope, snackbarHostState
+                            ) { refreshTrigger++ }
                             openDialog.value = false
                         }) {
                         Text(stringResource(R.string.confirm))

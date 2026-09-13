@@ -3,21 +3,27 @@
 package com.leohearts.alternativeunlockhook
 
 import android.annotation.SuppressLint
+import android.app.AndroidAppHelper
+import android.text.format.DateFormat
 import android.util.Log
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.io.FileNotFoundException
 import java.io.FileReader
-import java.util.Objects
+import java.security.MessageDigest
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 class HookClass : IXposedHookLoadPackage {
     // NOTE: When modifying this, make sure credential sufficiency validation logic is intact.
     companion object {
         const val TAG: String = "alternativeUnlockHook"
+
         // wait if you stored inside `com.android.systemui`, why move to here? for dual-user support? `/data/user/0/` mightve worked
         const val CONFIG_PATH: String = "/data/local/tmp/alternativePass.properties"
     }
@@ -27,6 +33,7 @@ class HookClass : IXposedHookLoadPackage {
     private var actionType: String = "sh"
     private var actionCommand: String = "whoami"
     private var dynamicLoad: String = "false"
+    private var timeIsPIN: String = "false"
 
     @SuppressLint("SdCardPath")
     fun initConfig() {
@@ -46,10 +53,26 @@ class HookClass : IXposedHookLoadPackage {
             actionCommand =
                 properties.getProperty("actionCommand", "whoami") // dont do anything if unset
             dynamicLoad = properties.getProperty("dynamicLoad", "false")
+            timeIsPIN = properties.getProperty("timeIsPIN", "false")
         } catch (e: Exception) {
             if (e.javaClass != FileNotFoundException::class.java) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun unlock(param: MethodHookParam, credType: Int) {
+        try {
+            val clazz = param.args[0].javaClass // read before overwriting
+            param.args[0] = try {
+                XposedHelpers.newInstance(clazz, credType, realPassword.toByteArray())
+            } catch (e: NoSuchMethodError) {
+                Log.e(TAG, "$e")
+                XposedHelpers.newInstance(clazz, credType, realPassword)
+            }
+            Log.i(TAG, "unlock: credential replaced")
+        } catch (t: Throwable) {
+            Log.e(TAG, "unlock: replacement failed: $t")
         }
     }
 
@@ -61,42 +84,54 @@ class HookClass : IXposedHookLoadPackage {
         )
         XposedBridge.hookAllMethods(lockPatternUtils, "checkCredential", object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
-                super.beforeHookedMethod(param)
-                if (Objects.equals(dynamicLoad, "true")) {
-                    initConfig() // load config again for debugging
-                }
-                Log.i(TAG, "beforeHookedMethod: Hooked " + param.method.name)
+                if (dynamicLoad == "true") initConfig()
                 val mCredential = param.args[0]
-                Log.d(TAG, "Cred: " + param.args[1].javaClass)
-                val cred = XposedHelpers.callMethod(
-                    mCredential, "getCredential"
-                ) as ByteArray // from android 14
-                val credStr = String(cred)
                 val credType = XposedHelpers.callMethod(mCredential, "getType") as Int
-                if (credStr == realPassword) {
-                    Log.i(TAG, "realPassword detected, suppressing logs")
+                val cred = XposedHelpers.callMethod(mCredential, "getCredential") as ByteArray
+                val attemptedStr = String(cred, Charsets.UTF_8)
+                if (MessageDigest.isEqual(cred, realPassword.toByteArray())) {
+                    Log.i(TAG, "device password detected, suppressing logs")
                 } else {
-                    Log.d(TAG, "credStr: $credStr")
-                    Log.d(TAG, "credBytes: " + cred.size + cred.contentToString())
-                }
-                Log.d(TAG, "credType: $credType")
-                if (credStr == fakePassword) {
-                    Log.i(TAG, "replaceCred: detected")
-                    try {
-                        if (actionType.contains("sh")) { // foolproof (totally)
-                            RootShell.system(actionCommand)
-                        } else if (actionType.contains("sudo")) {
-                            RootShell.sudo(actionCommand)
-                        }
-                    } catch (_: Exception) {
-                    }
-                    // replace with real password
-                    param.args[0] = XposedHelpers.newInstance(
-                        mCredential.javaClass, credType, realPassword as CharSequence
+                    Log.d(
+                        TAG,
+                        "credType: $credType attemptedStr: $attemptedStr " + "credBytes: ${cred.size} ${cred.contentToString()}"
                     )
-                    // this is the hacky way for less stability but more compatibility
-                    // You will need to track the logcat with `adb logcat | grep alternativeUnlockHook` for more details about "how to convert my pattern to a string"
-                    Log.i(TAG, "replaceCred: replaced")
+                }
+                fun sha256(input: String): ByteArray =
+                        MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+                if (timeIsPIN == "false") {
+                    if (MessageDigest.isEqual(sha256(attemptedStr), sha256(fakePassword))) {
+                        Log.i(TAG, "fakePassword matched")
+                        try {
+                            when (actionType.trim().lowercase()) {
+                                "sh", "shell" -> RootShell.system(actionCommand)
+                                "su", "sudo" -> RootShell.sudo(actionCommand)
+                                else -> Log.w(TAG, "unknown actionType '$actionType'")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "action failed: $e")
+                        }
+                        unlock(param, credType)
+                    } else {
+                        Log.i(TAG, "fakePassword did not match")
+                    }
+                } else if (timeIsPIN == "true") {
+                    val context = AndroidAppHelper.currentApplication()
+                    val is24hour = context?.let { DateFormat.is24HourFormat(it) } ?: false
+                    val hourPattern = if (is24hour) "HH" else "hh"
+                    val now = LocalTime.now()
+                    var time = now.format(DateTimeFormatter.ofPattern(hourPattern)) + now.format(
+                        DateTimeFormatter.ofPattern("mm")
+                    )
+                    val zeros = "0".repeat(maxOf(realPassword.length - time.length, 0))
+                    time += zeros
+                    Log.i(TAG, time)
+                    if (MessageDigest.isEqual(sha256(attemptedStr), sha256(time))) {
+                        Log.i(TAG, "Time matched")
+                        unlock(param, credType)
+                    } else {
+                        Log.i(TAG, "Time did not match")
+                    }
                 }
             }
         })

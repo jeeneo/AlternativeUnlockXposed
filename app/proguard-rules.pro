@@ -46,10 +46,11 @@
     public static ** requireNonNull(...);
 }
 
-# Strip debug log
+# Strip all logs (assume attacker can grab ADB)
 -assumenosideeffects class android.util.Log {
     public static int v(...);
     public static int d(...);
+    public static int i(...);
 }
 
 # Obfuscation
