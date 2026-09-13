@@ -438,8 +438,8 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                 },
             )
             GroupedWrapper(
-                title = "Use time as PIN",
-                description = if (timeIsPIN) "The current time will unlock" else "Fake pin will unlock",
+                title = "Use time as password",
+                description = if (timeIsPIN) "The current time will unlock" else "Fake password will unlock",
                 icon = rememberVectorPainter(if (timeIsPIN) Icons.Rounded.AccessTime else Icons.Rounded.Pin),
                 position = CardPosition.Trailing,
                 onClick = {
