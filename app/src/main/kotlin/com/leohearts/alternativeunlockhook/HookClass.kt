@@ -34,6 +34,8 @@ class HookClass : IXposedHookLoadPackage {
     private var actionCommand: String = "whoami"
     private var dynamicLoad: String = "false"
     private var timeIsPIN: String = "false"
+    private var runCommand: String = "false"
+    private var unlockDevice: String = "false"
 
     @SuppressLint("SdCardPath")
     fun initConfig() {
@@ -62,26 +64,30 @@ class HookClass : IXposedHookLoadPackage {
     }
 
     private fun unlock(param: MethodHookParam, credType: Int) {
-        try {
-            when (actionType.trim().lowercase()) {
-                "sh", "shell" -> RootShell.system(actionCommand)
-                "su", "sudo" -> RootShell.sudo(actionCommand)
-                else -> Log.w(TAG, "unknown actionType '$actionType'")
+        if (runCommand == "true") {
+            try {
+                when (actionType.trim().lowercase()) {
+                    "sh", "shell" -> RootShell.system(actionCommand)
+                    "su", "sudo" -> RootShell.sudo(actionCommand)
+                    else -> Log.w(TAG, "unknown actionType '$actionType'")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "action failed: $e")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "action failed: $e")
         }
-        try {
-            val clazz = param.args[0].javaClass // read before overwriting
-            param.args[0] = try {
-                XposedHelpers.newInstance(clazz, credType, realPassword.toByteArray())
-            } catch (e: NoSuchMethodError) {
-                Log.e(TAG, "$e")
-                XposedHelpers.newInstance(clazz, credType, realPassword)
+        if (unlockDevice == "true") {
+            try {
+                val clazz = param.args[0].javaClass // read before overwriting
+                param.args[0] = try {
+                    XposedHelpers.newInstance(clazz, credType, realPassword.toByteArray())
+                } catch (e: NoSuchMethodError) {
+                    Log.e(TAG, "$e")
+                    XposedHelpers.newInstance(clazz, credType, realPassword)
+                }
+                Log.i(TAG, "unlock: credential replaced")
+            } catch (t: Throwable) {
+                Log.e(TAG, "unlock: replacement failed: $t")
             }
-            Log.i(TAG, "unlock: credential replaced")
-        } catch (t: Throwable) {
-            Log.e(TAG, "unlock: replacement failed: $t")
         }
     }
 
@@ -107,7 +113,7 @@ class HookClass : IXposedHookLoadPackage {
                     )
                 }
                 fun sha256(input: String): ByteArray =
-                        MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+                    MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
                 if (timeIsPIN == "false") {
                     if (MessageDigest.isEqual(sha256(attemptedStr), sha256(fakePassword))) {
                         Log.i(TAG, "fakePassword matched")

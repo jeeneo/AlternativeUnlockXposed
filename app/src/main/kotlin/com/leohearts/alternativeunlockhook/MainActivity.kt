@@ -138,12 +138,31 @@ fun saveConfig(
     scope: CoroutineScope,
     snackbarHostState: SnackbarHostState
 ) {
-    val process = RootShell.sudo("cat > ${HookClass.CONFIG_PATH}")
+    val process = RootShell.sudo(
+        "cat > ${HookClass.CONFIG_PATH}.tmp && mv ${HookClass.CONFIG_PATH}.tmp ${HookClass.CONFIG_PATH}"
+    )
     if (process != null) {
-        config.store(process.outputStream, "")
-        setPermission()
-        scope.launch {
-            snackbarHostState.showSnackbar(context.getString(R.string.saved_to_config))
+        try {
+            config.store(process.outputStream, "")
+            process.outputStream.flush()
+            process.outputStream.close()
+            val exit = process.waitFor()
+            if (exit == 0) {
+                setPermission()
+                scope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.saved_to_config))
+                }
+            } else {
+                Log.e(HookClass.TAG, "saveConfig: write exited with code $exit")
+                scope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.save_failed_message))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(HookClass.TAG, "saveConfig: failed to write config: $e")
+            scope.launch {
+                snackbarHostState.showSnackbar(context.getString(R.string.save_failed_message))
+            }
         }
     } else {
         Log.e(HookClass.TAG, "saveConfig: failed to start su process")
@@ -381,7 +400,7 @@ fun SettingsBase(modifier: Modifier = Modifier) {
                 )
                 GroupedWrapper(
                     title = "Use time as PIN",
-                    description = if (timePinChecked) "The current time will unlock (padded with zeros)" else "Fake pin will unlock",
+                    description = if (timePinChecked) "The current time will unlock" else "Fake pin will unlock",
                     icon = if (timePinChecked) Icons.Rounded.AccessTime else Icons.Rounded.Pin,
                     position = CardPosition.Center,
                     onClick = {
