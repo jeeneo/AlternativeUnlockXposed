@@ -73,8 +73,7 @@ If you are using this software, please consider to give it a star ⭐ on [Github
 
 ## Screenshots
 
-<img width=30% src="fastlane/metadata/android/en-US/images/phoneScreenshots/01.png">
-<img width=30% src="fastlane/metadata/android/en-US/images/phoneScreenshots/02.png">
+<img width=30% src="fastlane/metadata/android/en-US/images/phoneScreenshots/01.png"> <img width=30% src="fastlane/metadata/android/en-US/images/phoneScreenshots/02.png">
 
 ## How does it work ?
 
