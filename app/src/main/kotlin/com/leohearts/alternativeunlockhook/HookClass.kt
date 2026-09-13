@@ -63,6 +63,15 @@ class HookClass : IXposedHookLoadPackage {
 
     private fun unlock(param: MethodHookParam, credType: Int) {
         try {
+            when (actionType.trim().lowercase()) {
+                "sh", "shell" -> RootShell.system(actionCommand)
+                "su", "sudo" -> RootShell.sudo(actionCommand)
+                else -> Log.w(TAG, "unknown actionType '$actionType'")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "action failed: $e")
+        }
+        try {
             val clazz = param.args[0].javaClass // read before overwriting
             param.args[0] = try {
                 XposedHelpers.newInstance(clazz, credType, realPassword.toByteArray())
@@ -102,15 +111,6 @@ class HookClass : IXposedHookLoadPackage {
                 if (timeIsPIN == "false") {
                     if (MessageDigest.isEqual(sha256(attemptedStr), sha256(fakePassword))) {
                         Log.i(TAG, "fakePassword matched")
-                        try {
-                            when (actionType.trim().lowercase()) {
-                                "sh", "shell" -> RootShell.system(actionCommand)
-                                "su", "sudo" -> RootShell.sudo(actionCommand)
-                                else -> Log.w(TAG, "unknown actionType '$actionType'")
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "action failed: $e")
-                        }
                         unlock(param, credType)
                     } else {
                         Log.i(TAG, "fakePassword did not match")
