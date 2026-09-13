@@ -82,11 +82,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AlternativeUnlockXposedTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
-                ) {
-                    SettingsBase()
-                }
+                SettingsBase()
             }
             migrateOldConfig()
         }
