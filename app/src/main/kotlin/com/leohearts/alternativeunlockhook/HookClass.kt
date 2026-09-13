@@ -21,6 +21,10 @@ import java.util.Properties
 
 class HookClass : IXposedHookLoadPackage {
     // NOTE: When modifying this, make sure credential sufficiency validation logic is intact.
+
+    // also note: proguard minifcation strips all logging in release builds to prevent
+    // the event of a log readout happening, eg. if an attacker has shell permissions (although worst-case)
+
     companion object {
         const val TAG: String = "alternativeUnlockHook"
 
@@ -34,8 +38,8 @@ class HookClass : IXposedHookLoadPackage {
     private var actionCommand: String = "whoami"
     private var dynamicLoad: String = "false"
     private var timeIsPIN: String = "false"
-    private var runCommand: String = "false"
-    private var unlockDevice: String = "false"
+    private var runCommand: String = "true"
+    private var unlockDevice: String = "true"
 
     @SuppressLint("SdCardPath")
     fun initConfig() {
@@ -56,6 +60,8 @@ class HookClass : IXposedHookLoadPackage {
                 properties.getProperty("actionCommand", "whoami") // dont do anything if unset
             dynamicLoad = properties.getProperty("dynamicLoad", "false")
             timeIsPIN = properties.getProperty("timeIsPIN", "false")
+            runCommand = properties.getProperty("runCommand", "true")
+            unlockDevice = properties.getProperty("unlockDevice", "true")
         } catch (e: Exception) {
             if (e.javaClass != FileNotFoundException::class.java) {
                 e.printStackTrace()
@@ -74,20 +80,23 @@ class HookClass : IXposedHookLoadPackage {
             } catch (e: Exception) {
                 Log.e(TAG, "action failed: $e")
             }
+        } else {
+            Log.i(TAG, "Not running action")
         }
         if (unlockDevice == "true") {
             try {
                 val clazz = param.args[0].javaClass // read before overwriting
                 param.args[0] = try {
-                    XposedHelpers.newInstance(clazz, credType, realPassword.toByteArray())
-                } catch (e: NoSuchMethodError) {
-                    Log.e(TAG, "$e")
                     XposedHelpers.newInstance(clazz, credType, realPassword)
+                } catch (e: NoSuchMethodError) {
+                    Log.e(TAG, "NoSuchMethodError: $e")
                 }
                 Log.i(TAG, "unlock: credential replaced")
             } catch (t: Throwable) {
                 Log.e(TAG, "unlock: replacement failed: $t")
             }
+        } else {
+            Log.i(TAG, "Duress password entered, skipping device unlock")
         }
     }
 
@@ -109,7 +118,7 @@ class HookClass : IXposedHookLoadPackage {
                 } else {
                     Log.d(
                         TAG,
-                        "credType: $credType attemptedStr: $attemptedStr " + "credBytes: ${cred.size} ${cred.contentToString()}"
+                        "credType: $credType, attemptedStr: $attemptedStr, credBytes: ${cred.size} ${cred.contentToString()}"
                     )
                 }
                 fun sha256(input: String): ByteArray =
@@ -121,7 +130,10 @@ class HookClass : IXposedHookLoadPackage {
                     } else {
                         Log.i(TAG, "fakePassword did not match")
                     }
-                } else if (timeIsPIN == "true") {
+                } else if (timeIsPIN == "true" && !(MessageDigest.isEqual( // if timeIsPIN and the entered data isn't the real password
+                        sha256(attemptedStr), sha256(realPassword)
+                    ))
+                ) {
                     val context = AndroidAppHelper.currentApplication()
                     val is24hour = context?.let { DateFormat.is24HourFormat(it) } ?: false
                     val hourPattern = if (is24hour) "HH" else "hh"
