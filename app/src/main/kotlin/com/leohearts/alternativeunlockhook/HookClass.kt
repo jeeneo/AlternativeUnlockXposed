@@ -113,16 +113,16 @@ class HookClass : IXposedHookLoadPackage {
                 val credType = XposedHelpers.callMethod(mCredential, "getType") as Int
                 val cred = XposedHelpers.callMethod(mCredential, "getCredential") as ByteArray
                 val attemptedStr = String(cred, Charsets.UTF_8)
-                if (MessageDigest.isEqual(cred, realPassword.toByteArray())) {
-                    Log.i(TAG, "device password detected, suppressing logs")
+                fun sha256(input: String): ByteArray =
+                    MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+                if (MessageDigest.isEqual(sha256(attemptedStr), sha256(realPassword))) {
+                    Log.i(TAG, "device password detected")
                 } else {
                     Log.d(
                         TAG,
                         "credType: $credType, attemptedStr: $attemptedStr, credBytes: ${cred.size} ${cred.contentToString()}"
                     )
                 }
-                fun sha256(input: String): ByteArray =
-                    MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
                 if (timeIsPIN == "false") {
                     if (MessageDigest.isEqual(sha256(attemptedStr), sha256(fakePassword))) {
                         Log.i(TAG, "fakePassword matched")
